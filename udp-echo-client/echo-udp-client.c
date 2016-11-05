@@ -8,6 +8,7 @@
 #include <getopt.h>
 #include <limits.h>
 #include <errno.h>
+#include <pthread.h>
 
 #define MAX_BUFFER_SIZE 1024
 
@@ -21,6 +22,8 @@ void print_usage() {
     printf("\t-b, --broadcast\t\t\tUse broadcast send mode\n");
     printf("\t-h, --help\t\t\tDisplay this help screen\n");
 }
+
+void* receive_handler(void *params);
 
 int main(int argc, char **argv) {
 
@@ -84,9 +87,7 @@ int main(int argc, char **argv) {
     int client_socket = 0;
     struct sockaddr_in server_address;
     char byte_to_send = 0;
-    char buffer[MAX_BUFFER_SIZE] = {0};
     int bytes_sent = 0;
-    int bytes_received = 0;
 
     client_socket = socket(PF_INET, SOCK_DGRAM, 0);
     if (client_socket < 0) {
@@ -98,24 +99,46 @@ int main(int argc, char **argv) {
     if (broadcast_mode) {
         int broadcast_enable = 1;
         if (setsockopt(client_socket, SOL_SOCKET, SO_BROADCAST, &broadcast_enable, sizeof(broadcast_enable)) < 0) {
-            perror("setsockopt error\n");
+            perror("Error setsockopt\n");
             return -1;
         }
         server_address.sin_addr.s_addr = htonl(INADDR_BROADCAST);
     }
     else {
         struct hostent *hp = gethostbyname(domain);
-        if (!hp) {
-            perror("Invalid or unknown host\n");
+        if (NULL == hp) {
+            perror("Error gethostbyname\n");
             return -1;
         }
         memcpy(&server_address.sin_addr.s_addr, hp->h_addr, hp->h_length);
     }
     server_address.sin_port = htons(port);
 
+    pthread_attr_t attrs;
+    if (0 != pthread_attr_init(&attrs)) {
+        perror("Error pthread_attr_init");
+        return -1;
+    }
+    if (0 != pthread_attr_setdetachstate(&attrs, PTHREAD_CREATE_JOINABLE)) {
+        perror("Error pthread_attr_setdetachstate");
+        return -1;
+    }
+
+    pthread_t thread_id;
+    if (0 != pthread_create(&thread_id, &attrs, receive_handler, &client_socket)) {
+        perror("Error pthread_create");
+        return -1;
+    }
+
     printf("Please input character to send to server\n");
     while(1) {
         byte_to_send = getche();
+        if (0x03 == byte_to_send) { //that's the CTRL+C - SIGINT does not involve by system until our customized getche is pending
+            pthread_cancel(thread_id);
+            pthread_attr_destroy(&attrs);
+            pthread_join(thread_id, NULL);
+            return 0;
+        }
         printf("\n");
 
         bytes_sent = sendto(client_socket,
@@ -126,22 +149,32 @@ int main(int argc, char **argv) {
                             sizeof(server_address));
 
         if (bytes_sent < 0) {
-            perror("sendto error");
+            perror("Error sendto");
             return -1;
         }
-
-        bytes_received = recvfrom(client_socket, buffer, MAX_BUFFER_SIZE, 0, NULL, NULL);
-        if (bytes_received < 0) {
-            perror("recvfrom error");
-            return -1;
-        }
-
-        printf("the server answer is: ");
-        for (int i = 0; i < bytes_received; ++bytes_received)
-            putchar(buffer[i]);
-
-        printf("\n");
     }
     return 0;
 }
 
+void* receive_handler(void *params) {
+//    printf("%s\n", __FUNCTION__);
+    if (NULL == params)
+        return NULL;
+    int client_socket = *(int*)params;
+    char buffer[MAX_BUFFER_SIZE] = {0};
+    int bytes_received = 0;
+
+    while (1) {
+        bytes_received = recvfrom(client_socket, buffer, MAX_BUFFER_SIZE, 0, NULL, NULL);
+        if (bytes_received < 0) {
+            perror("Error recvfrom");
+            return NULL;
+        }
+
+        printf("the server answer is: ");
+        for (int i = 0; i < bytes_received; ++i)
+            putchar(buffer[i]);
+
+        printf("\n");
+    }
+}

@@ -1,7 +1,7 @@
 #IDIR =../include
 CC=gcc
 #CFLAGS=-I$(IDIR)
-CFLAGS = -Wall
+CFLAGS = -Wall -pthread
 
 #ODIR=obj
 ODIR=.
