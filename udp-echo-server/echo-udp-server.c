@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
 
     struct sockaddr_in socket_address;
     socket_address.sin_family = AF_INET;
-    socket_address.sin_addr.s_addr = inet_addr("192.168.1.3");//htonl(INADDR_ANY);
+    socket_address.sin_addr.s_addr = htonl(INADDR_ANY);
     socket_address.sin_port = htons(port);
 
     int server_socket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
