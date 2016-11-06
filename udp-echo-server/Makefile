@@ -1,13 +1,13 @@
 CC=gcc
-CFLAGS = -Wall -pthread
+CFLAGS = -Wall
 LIBS=
 
-OBJ = echo-udp-client.o utils.o
+OBJ = echo-udp-server.o
 
 $(ODIR)/%.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-echo-udp-client: $(OBJ)
+echo-udp-server: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
 .PHONY: clean
