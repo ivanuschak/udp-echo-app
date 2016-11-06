@@ -89,10 +89,16 @@ int main(int argc, char **argv) {
     char byte_to_send = 0;
     int bytes_sent = 0;
 
-    client_socket = socket(PF_INET, SOCK_DGRAM, 0);
+    client_socket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (client_socket < 0) {
         perror("Socket create error\n");
         return -1;
+    }
+
+    int on = 1;
+    if (setsockopt(client_socket, SOL_SOCKET,  SO_REUSEADDR, &on, sizeof(on)) < 0) {
+          perror("Error setsockopt SO_REUSEADDR");
+          return -1;
     }
 
     server_address.sin_family = AF_INET;
@@ -157,7 +163,7 @@ int main(int argc, char **argv) {
 }
 
 void* receive_handler(void *params) {
-//    printf("%s\n", __FUNCTION__);
+    printf("\n%s\n", __FUNCTION__);
     if (NULL == params)
         return NULL;
     int client_socket = *(int*)params;
